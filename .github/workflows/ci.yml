@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-check:
+    name: Build & verify dist
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check dist is up to date
+        run: npm run build:check
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate action.yml inputs/outputs
+        run: |
+          node -e "
+            const fs = require('fs');
+            const content = fs.readFileSync('action.yml', 'utf8');
+            if (content.length === 0) { console.error('action.yml is empty'); process.exit(1); }
+            // Check required top-level keys are present
+            ['name:', 'description:', 'inputs:', 'outputs:', 'runs:'].forEach(key => {
+              if (!content.includes(key)) {
+                console.error('action.yml is missing key: ' + key);
+                process.exit(1);
+              }
+            });
+            console.log('action.yml exists and contains required keys.');
+          "
+
+      - name: Verify src/index.js syntax
+        run: node --check src/index.js
+
+      - name: Verify dist/index.js syntax
+        run: node --check dist/index.js
