@@ -12,6 +12,20 @@ on:
         required: false
         default: false
         type: boolean
+      language:
+        description: "Release notes language: zh (Chinese), en (English), or both (bilingual)"
+        required: false
+        default: "both"
+        type: choice
+        options:
+          - zh
+          - en
+          - both
+      model:
+        description: "Ollama model to use for release notes generation"
+        required: false
+        default: "qwen2.5:0.5b"
+        type: string
 
 jobs:
   release:
@@ -69,41 +83,14 @@ jobs:
             git push origin "${MAJOR_TAG}" --force
           fi
 
-      - name: Generate release notes between previous tag and this tag
-        id: gen_notes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ inputs.version }}"
-
-          # Find the previous tag
-          PREV_TAG=$(git tag --sort=-creatordate \
-            | grep -v "^v[0-9]*$" \
-            | grep -v "^${VERSION}$" \
-            | head -n 1)
-
-          if [ -z "${PREV_TAG}" ]; then
-            echo "No previous tag found; using initial commit."
-            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
-          fi
-
-          echo "Previous tag: ${PREV_TAG}"
-          echo "PREV_TAG=${PREV_TAG}" >> "$GITHUB_ENV"
-
-          # Collect commits
-          COMMITS=$(git log "${PREV_TAG}..${VERSION}" \
-            --no-merges \
-            --pretty=format:'- %s (%an, %h)' || true)
-
-          if [ -z "${COMMITS}" ]; then
-            COMMITS="- (no new commits)"
-          fi
-
-          NOTES="## What's Changed\n\n${COMMITS}\n\n**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}"
-
-          # Write to file (handle multiline)
-          printf '%b' "${NOTES}" > release_notes.md
-          cat release_notes.md
+      - name: Generate AI release notes
+        id: ai_notes
+        uses: ./
+        with:
+          to_tag: ${{ inputs.version }}
+          model: ${{ inputs.model }}
+          language: ${{ inputs.language }}
+          include_diffstat: "true"
 
       - name: Create GitHub Release
         env:
@@ -114,6 +101,9 @@ jobs:
           if [ "${{ inputs.prerelease }}" = "true" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
+
+          # Write release notes to file
+          printf '%s' "${{ steps.ai_notes.outputs.release_notes }}" > release_notes.md
 
           gh release create "${VERSION}" \
             --title "${VERSION}" \

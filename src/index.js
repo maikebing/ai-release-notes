@@ -343,8 +343,9 @@ async function run() {
     }
 
     // Validate model name to prevent shell injection (allow alphanumeric, colon, dot, dash, slash)
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_./:@-]*$/.test(model)) {
-      throw new Error(`Invalid model name "${model}". Only alphanumeric characters, colons, dots, dashes, slashes and @ are allowed.`);
+    // The optional @sha256:<hex> suffix covers digest-pinned model references.
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_./:-]*(@sha256:[a-fA-F0-9]+)?$/.test(model)) {
+      throw new Error(`Invalid model name "${model}". Only alphanumeric characters, colons, dots, dashes, and slashes are allowed (optionally followed by @sha256:<digest>).`);
     }
 
     // Validate ollama host is a safe URL (no shell special characters)

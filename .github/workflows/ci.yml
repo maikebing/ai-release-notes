@@ -45,21 +45,20 @@ jobs:
         run: npm ci
 
       - name: Validate action.yml inputs/outputs
-        run: node -e "
-          const yaml = require('js-yaml');
-          const fs = require('fs');
-          const action = yaml.load(fs.readFileSync('action.yml', 'utf8'));
-          const inputs = Object.keys(action.inputs || {});
-          const outputs = Object.keys(action.outputs || {});
-          console.log('Inputs:', inputs.join(', '));
-          console.log('Outputs:', outputs.join(', '));
-          console.log('action.yml is valid YAML.');
-        " 2>/dev/null || node -e "
-          const fs = require('fs');
-          const content = fs.readFileSync('action.yml', 'utf8');
-          if (content.length === 0) { process.exit(1); }
-          console.log('action.yml exists and is non-empty.');
-        "
+        run: |
+          node -e "
+            const fs = require('fs');
+            const content = fs.readFileSync('action.yml', 'utf8');
+            if (content.length === 0) { console.error('action.yml is empty'); process.exit(1); }
+            // Check required top-level keys are present
+            ['name:', 'description:', 'inputs:', 'outputs:', 'runs:'].forEach(key => {
+              if (!content.includes(key)) {
+                console.error('action.yml is missing key: ' + key);
+                process.exit(1);
+              }
+            });
+            console.log('action.yml exists and contains required keys.');
+          "
 
       - name: Verify src/index.js syntax
         run: node --check src/index.js
